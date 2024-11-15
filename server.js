@@ -15,74 +15,64 @@ app.get('/', (req, res) => {
 });
 
 app.post('/create-tmate', (req, res) => {
-    // Ambil nama sesi dari body request atau gunakan default
-app.post('/create-tmate', (req, res) => {
     const sessionName = req.body.sessionName || `zumyfree-${Date.now()}`;
     const createSessionCmd = `tmate -k ${TMATE_API_KEY} -n ${sessionName} new-session -d`;
 
     console.log('Executing command:', createSessionCmd);
 
+    // Fungsi untuk mendapatkan informasi koneksi
+    const getConnectionInfo = (displayFormat) => {
+        return new Promise((resolve, reject) => {
+            exec(`tmate -S /tmp/tmate.sock display -p "${displayFormat}"`, (err, output, stderr) => {
+                if (err) {
+                    console.error(`Error getting connection info for ${displayFormat}:`, stderr);
+                    reject(stderr);
+                } else {
+                    resolve(output.trim());
+                }
+            });
+        });
+    };
+
+    // Eksekusi perintah membuat sesi
     exec(createSessionCmd, (error, stdout, stderr) => {
         if (error) {
-            console.error('Error executing command:', stderr);
+            console.error('Error executing tmate command:', stderr);
             return res.status(500).json({ 
                 error: `Gagal membuat sesi: ${stderr}`,
                 command: createSessionCmd
             });
         }
 
-        const getConnectionInfo = (displayFormat) => {
-            return new Promise((resolve, reject) => {
-                exec(`tmate -S /tmp/tmate.sock display -p "${displayFormat}"`, (err, output, stderr) => {
-                    if (err) {
-                        reject(stderr);
-                    } else {
-                        resolve(output.trim());
-                    }
+        // Tunggu beberapa saat sebelum mengambil informasi koneksi
+        setTimeout(() => {
+            Promise.all([
+                getConnectionInfo("#{tmate_ssh}"),
+                getConnectionInfo("#{tmate_web}")
+            ])
+            .then(([sshConn, webConn]) => {
+                res.json({ 
+                    sessionName: sessionName,
+                    sshLink: sshConn,
+                    webLink: webConn,
+                    apiKey: TMATE_API_KEY
+                });
+            })
+            .catch(error => {
+                console.error('Gagal mendapatkan informasi koneksi:', error);
+                res.status(500).json({ 
+                    error: 'Gagal mendapatkan informasi koneksi',
+                    details: error 
                 });
             });
-        };
-
-        Promise.all([
-            getConnectionInfo("#{tmate_ssh}"),
-            getConnectionInfo("#{tmate_web}")
-        ])
-        .then(([sshConn, webConn]) => {
-            res.json({ 
-                sessionName: sessionName,
-                sshLink: sshConn,
-                webLink: webConn,
-                apiKey: TMATE_API_KEY
-            });
-        })
-        .catch(error => {
-            res.status(500).json({ 
-                error: 'Gagal mendapatkan informasi koneksi',
-                details: error 
-            });
-        });
+        }, 2000); // Tambahkan delay 2 detik untuk memastikan sesi terbentuk
     });
 });
-        // Dapatkan informasi koneksi SSH dan Web
-        Promise.all([
-            getConnectionInfo("#{tmate_ssh}"),
-            getConnectionInfo("#{tmate_web}")
-        ])
-        .then(([sshConn, webConn]) => {
-            res.json({ 
-                sessionName: sessionName,
-                sshLink: sshConn,
-                webLink: webConn,
-                apiKey: TMATE_API_KEY
-            });
-        })
-        .catch(error => {
-            res.status(500).json({ 
-                error: 'Gagal mendapatkan informasi koneksi',
-                details: error 
-            });
-        });
-    });
+
+// Tambahkan error handling untuk server
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Terjadi kesalahan pada server!');
 });
 
 app.listen(port, () => {

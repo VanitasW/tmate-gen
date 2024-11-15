@@ -44,7 +44,7 @@ app.post('/create-tmate', (req, res) => {
         };
 
         Promise.all([
-            getConnection Info("#{tmate_ssh}"),
+            getConnectionInfo("#{tmate_ssh}"),
             getConnectionInfo("#{tmate_web}")
         ])
         .then(([sshConn, webConn]) => {

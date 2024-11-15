@@ -16,20 +16,21 @@ app.get('/', (req, res) => {
 
 app.post('/create-tmate', (req, res) => {
     // Ambil nama sesi dari body request atau gunakan default
+app.post('/create-tmate', (req, res) => {
     const sessionName = req.body.sessionName || `zumyfree-${Date.now()}`;
-    
-    // Perintah untuk membuat tmate session dengan nama khusus dan API key
     const createSessionCmd = `tmate -k ${TMATE_API_KEY} -n ${sessionName} new-session -d`;
-    
+
+    console.log('Executing command:', createSessionCmd);
+
     exec(createSessionCmd, (error, stdout, stderr) => {
         if (error) {
+            console.error('Error executing command:', stderr);
             return res.status(500).json({ 
                 error: `Gagal membuat sesi: ${stderr}`,
                 command: createSessionCmd
             });
         }
-        
-        // Fungsi untuk mendapatkan informasi koneksi
+
         const getConnectionInfo = (displayFormat) => {
             return new Promise((resolve, reject) => {
                 exec(`tmate -S /tmp/tmate.sock display -p "${displayFormat}"`, (err, output, stderr) => {
@@ -42,6 +43,26 @@ app.post('/create-tmate', (req, res) => {
             });
         };
 
+        Promise.all([
+            getConnection Info("#{tmate_ssh}"),
+            getConnectionInfo("#{tmate_web}")
+        ])
+        .then(([sshConn, webConn]) => {
+            res.json({ 
+                sessionName: sessionName,
+                sshLink: sshConn,
+                webLink: webConn,
+                apiKey: TMATE_API_KEY
+            });
+        })
+        .catch(error => {
+            res.status(500).json({ 
+                error: 'Gagal mendapatkan informasi koneksi',
+                details: error 
+            });
+        });
+    });
+});
         // Dapatkan informasi koneksi SSH dan Web
         Promise.all([
             getConnectionInfo("#{tmate_ssh}"),
